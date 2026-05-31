@@ -3,6 +3,8 @@
 **Daily MTG reprint-risk forecast: cards likely to be reprinted in 3 / 6 / 12 months.**
 By Cameraderie Cards. Informational only, not financial advice.
 
+> Part of the **Cameraderie Cards** toolkit: [`mtg-buy-signal`](https://github.com/rnorlund/mtg-buy-signal) · [`mtg-sell-signal`](https://github.com/rnorlund/mtg-sell-signal) · [`mtg-reprint-signal`](https://github.com/rnorlund/mtg-reprint-signal) (you are here)
+
 A survival-analysis model that estimates, for every Magic: The Gathering card,
 the probability Wizards of the Coast reprints it in paper within the next 3,
 6, and 12 months. Trained on the full Scryfall print history (1993 to 2026)
@@ -86,10 +88,14 @@ Magic: The Gathering reprint forecasting. 2026.
 https://github.com/rnorlund/mtg-reprint-signal
 ```
 
-## Companion projects
+## Sibling repositories
 
-- [mtg-buy-signal](https://github.com/rnorlund/mtg-buy-signal) - cards likely to spike
-- [mtg-sell-signal](https://github.com/rnorlund/mtg-sell-signal) - cards likely to fall
+| Repo | Question it answers |
+|---|---|
+| [`mtg-buy-signal`](https://github.com/rnorlund/mtg-buy-signal) | Which cards are likely to spike upward — when to **buy** |
+| [`mtg-sell-signal`](https://github.com/rnorlund/mtg-sell-signal) | Which cards have peaked and are likely to fall — when to **sell** |
+| [`mtg-reprint-signal`](https://github.com/rnorlund/mtg-reprint-signal) | Which cards are at risk of being reprinted — when to **brace** |
+| [`cameraderie-cards`](https://github.com/rnorlund/cameraderie-cards) | Umbrella landing page |
 
 ## License
 
