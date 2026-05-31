@@ -61,24 +61,37 @@ From the catalog we reconstruct the full **reprint event history**: 63,158 repri
 
 We treat each card-month as a **right-censored time-to-event observation**. For every card on the first of each month (2017 onward - 2.57 million observations in total), we measure how many months elapse until its next paper reprint. Cards not yet reprinted are *censored*, not labelled "negative." This is the statistically correct way to model "when will X happen" and avoids the bias of pretending a recently printed card is a confirmed non-reprint.
 
-We fit an **XGBoost Accelerated Failure Time (AFT)** survival model, which predicts a full time-to-reprint distribution per card. We then read off P(reprint ≤ 3mo), P(≤ 6mo), P(≤ 12mo).
+We fit a **gradient-boosted survival model** with an accelerated-failure-time
+formulation, which predicts a full time-to-reprint distribution per card. We
+then read off P(reprint ≤ 3mo), P(≤ 6mo), P(≤ 12mo).
 
-## 3.2 Features (152 total)
+## 3.2 Feature categories
 
-- **Print history** - number and recency of prior printings, by product type (expansion, Commander, Masters, Secret Lair, promo…), median gap between reprints.
-- **Price signals** - current price, price vs. 30/90/365-day momentum, volatility, count of recent price spikes, and the *most expensive* printing (collector-demand proxy).
-- **Demand** - EDHREC Commander inclusion count and rate.
-- **Format legality** - legal in Standard / Pioneer / Modern / Legacy / Vintage / Pauper / Commander / Brawl.
-- **Card intrinsics** - rarity, colors, mana value, type, keywords, plus a 32-dimension semantic embedding of the card's rules text.
-- **Calendar** - month-of-year seasonality and product-window effects.
-- **Functional-reprint clustering** - detection of "reskins" (same mechanics, new name, e.g. Universes Beyond → Universes Within).
+Features fall into seven categories, each engineered to be point-in-time as of
+the snapshot date:
+
+- **Print history** - signals derived from how, when, and in what product types
+  a card has been reprinted before.
+- **Price signals** - level, momentum, volatility, and spike behavior in the
+  secondary market.
+- **Demand** - how widely the card is played in Commander.
+- **Format legality** - which constructed formats currently accept the card.
+- **Card intrinsics** - rarity, colors, mana value, type, keywords, and a
+  semantic embedding of the card's rules text.
+- **Calendar** - seasonal and product-window effects in the release schedule.
+- **Functional-reprint clustering** - detection of mechanically-identical
+  reskins (e.g. Universes Beyond ↔ Universes Within).
+
+Exact feature definitions, transformations, hyperparameters, and the trained
+model weights are not released. The categories above and the validation
+results below are sufficient to evaluate the modeling approach.
 
 ## 3.3 Leakage controls (why the numbers are trustworthy)
 
 The biggest risk in a model like this is **accidentally using future information**. Our defences:
 
 1. **Point-in-time features** - every feature for a given month uses only data available on or before that month (prices via strict backward as-of joins).
-2. **Four-way time-blocked split** - train (≤ 2023-06), early-stopping (2023-07 to 2023-12), calibration (2024-01 to 2024-06), and a fully held-out test block (2024-07 to 2025-06). The calibration set is deliberately separate from the early-stopping set so probability estimates are not over-fit.
+2. **Four-way time-blocked split** - the data is partitioned chronologically into separate training, early-stopping, calibration, and held-out test blocks. The calibration set is deliberately separate from the early-stopping set so probability estimates are not over-fit.
 3. **Reserved List exclusion** - the 571 cards that legally cannot be reprinted are removed.
 
 We further verified leakage empirically - see §5.
@@ -132,38 +145,35 @@ June 2024 snapshot, grouped by what actually happened over the following year.
 
 # 5. What drives the predictions
 
-![Feature importance](figures/feature_importance.png)
-
-*Figure 7. Top-25 features by XGBoost gain. Format legality (especially Brawl/Pauper/Commander/Standard), EDHREC Commander demand, prior-printing counts, and rarity dominate the tree splits.*
-
-Gain measures how often a feature is *used*, not how much it is *needed* - correlated features share the load. To measure what is actually necessary, we ran a **feature-group ablation**: retrain with each group removed and measure the drop in accuracy.
+We measure what each input category actually contributes by **feature-group
+ablation**: retrain with each group removed and measure the drop in
+held-out accuracy.
 
 ![Feature-group ablation](figures/ablation.png)
 
-*Figure 8. Longer bar = removing that group hurt accuracy more = that group mattered more. The dominant drivers are reprint **calendar** cadence (+0.020), **Commander demand** (+0.018), and **print history** (+0.016), followed by **format legality** (+0.009).*
+*Figure 7. Longer bar = removing that group hurt accuracy more = that group mattered more. The dominant drivers are reprint **calendar** cadence, **Commander demand**, and **print history**, followed by **format legality**.*
 
 **The honest attribution.** The structural drivers of reprints are **demand and cadence**: how popular a card is in Commander, how the release calendar is moving, and how long it has been since the card was last printed. Format legality refines this. These are exactly the levers Wizards of the Coast actually pulls when choosing reprints.
 
-**On price - a careful correction.** An earlier interim analysis (run when only ~55% of cards had price coverage) appeared to show price as the single largest signal. With the full ~90%-coverage dataset, that effect mostly disappears (price contributes ≈ +0.002 AUC). The earlier result was largely a **data-availability artifact**: when only the more valuable, actively-traded cards had price data, the mere *presence* of a price was itself a proxy for "this card matters." Once nearly every card has price history, raw price momentum adds little *independent* signal - it is real, but largely **redundant** with the demand and cadence features it correlates with. The community intuition that "a price climb precedes a reprint" is not wrong; it is simply that the climb and the reprint share a common cause (rising demand), which the model captures more directly through Commander play.
+**On price - a careful correction.** An earlier interim analysis (run before price coverage was complete) appeared to show price as the single largest signal. With full price coverage, that effect mostly disappears. The earlier result was largely a **data-availability artifact**: when only the more valuable, actively-traded cards had price data, the mere *presence* of a price was itself a proxy for "this card matters." Once nearly every card has price history, raw price momentum adds little *independent* signal - it is real, but largely **redundant** with the demand and cadence signals it correlates with. The community intuition that "a price climb precedes a reprint" is not wrong; the climb and the reprint share a common cause (rising demand), which the model captures more directly through Commander play.
 
-**On EDHREC and leakage.** EDHREC demand is a top contributor (+0.018). Although these counts were collected at the current date, removing them changes held-out accuracy by a similar small amount in both directions, and the model's calibration on strictly-past data holds - so there is no material future-information leak.
+**On leakage.** Demand counts are sampled at the current date rather than back-dated. Removing them changes held-out accuracy by a comparable small amount in both directions, and the model's calibration on strictly-past data holds - so there is no material future-information leak.
 
 **A direct test of price-history completeness.** After an initial build, we
-discovered a scraping bug that had left ~30 older sets (Tempest, Mirage, 7th
-Edition, Urza's Saga, the Power 9 originals, …) with no price history. We fixed
-it, expanding price coverage from 87.2% to 96.5% of observations (price points
-150M → 171M, cards 28k → 30.5k), and retrained. **The held-out AUC moved by
-+0.001 at every horizon** - i.e. essentially not at all. This is a clean natural
-experiment confirming the conclusion above: the model's predictive power comes
-from demand, cadence, and format relevance, not from how complete the price
-history is. (The fuller price data is still valuable for the product surface and
-for scoring the entire card universe - it simply is not what drives accuracy.)
+discovered an ingestion bug that had left some older sets with no price
+history. We fixed it, materially expanding price coverage of the training
+panel, and retrained. **The held-out AUC moved by ≈ +0.001 at every horizon** -
+i.e. essentially not at all. This is a clean natural experiment confirming the
+conclusion above: the model's predictive power comes from demand, cadence, and
+format relevance, not from how complete the price history is. (The fuller price
+data is still valuable for the product surface and for scoring the entire card
+universe - it simply is not what drives accuracy.)
 
 ---
 
 # 6. Limitations & Honest Caveats
 
-- **Price history depth.** Daily prices reach back to ~2010 (when MTGGoldfish began tracking). Cards from the 1990s-2000s have full *catalog* history but shorter *price* history.
+- **Price history depth.** Daily secondary-market prices reach back to roughly 2010. Cards from the 1990s-2000s have full *catalog* history but shorter *price* history.
 - **Demand snapshot.** EDHREC counts are current, not historical; we showed this is immaterial to accuracy, but it is a known approximation.
 - **Format-legality timeline.** We use current legality as a proxy; a full historical ban-list timeline is a planned enhancement.
 - **Announcement shocks.** The model predicts on fundamentals; it cannot know about an unannounced product Wizards has secretly planned. It estimates *risk*, not certainty.
@@ -191,12 +201,26 @@ The deliverables are designed to drop into a product:
 
 ---
 
-# 8. Reproducibility & Stack
+# 8. Verifiability
 
-- **Language/libraries:** Python 3.12, Polars, XGBoost (survival:aft), scikit-learn (isotonic calibration), sentence-transformers (text embeddings), Optuna (hyperparameter search).
-- **Compute:** Model training and 80-trial hyperparameter sweep run on an NVIDIA GB10 (Grace-Blackwell) workstation; data engineering in Polars.
-- **Hyperparameters** were selected by Optuna (80 trials) minimising calibrated Brier score; the winning configuration uses an extreme-value (Gumbel) failure distribution, depth-10 trees, and aggressive feature subsampling.
-- The full pipeline - ingestion, feature engineering, training, calibration, evaluation, and prediction - is scripted and version-controlled.
+The numbers in this report are reproducible from this repository **even
+without the model**: every figure here is derived from the dated prediction
+snapshots and validation outputs that are checked into `outputs/` and
+`track_record/`. The methodology can be evaluated against the future:
+
+- The dated track-record snapshots in `track_record/` come with SHA-256
+  hashes in `MANIFEST.md`. Anyone can compare a past snapshot's predictions
+  against which cards Wizards actually reprinted afterward, with no way for
+  us to quietly rewrite the record.
+- The held-out forward test in `outputs/validation/2024-06-01/` shows the
+  raw top-100 picks and which of them were actually reprinted - the result
+  is checkable card-by-card.
+- The ablation, ROC, reliability, and case-study figures are reproduced
+  from these same outputs.
+
+The trained model, the live ingestion and scoring pipeline, the exact
+hyperparameters, and the engineered-feature definitions are not included;
+those remain commercial assets of Cameraderie Cards.
 
 ---
 
