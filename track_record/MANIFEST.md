@@ -275,6 +275,8 @@ historical snapshot has not been altered.
 | 2026-10-13 | `2026-10-13_predictions.json` | 32691 | `2ec72e2fec0a661a769d4a1eb486678523e403cbcf33764e7a60999d2428ae06` |
 | 2026-10-14 | `2026-10-14_predictions.csv` | 32691 | `0e421212a5e6e0c2a1c43eb393142a8f82f347c03571bfd6c46daa14ed8c34fb` |
 | 2026-10-14 | `2026-10-14_predictions.json` | 32691 | `f176388fa73b83922004b8a1a3f6f953d1294fc2d040b32145c2900c55cfca48` |
+| 2026-10-15 | `2026-10-15_predictions.csv` | 32691 | `ac7d677cc0309e64b36445ef034cd42dc1d0dbe6e2801c248655317c2f5c8d90` |
+| 2026-10-15 | `2026-10-15_predictions.json` | 32691 | `c6f5e3ea4726c77754dfc6db0bb445e5c432d3d05ba0d001d71f652d25da4535` |
 
 ## How to verify
 
